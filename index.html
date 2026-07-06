@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tải Truyện & Change Version → HTML</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #0d0a07;
+      --pg: #f5ede0;
+      --gold: #c8923a;
+      --muted: #8a7060;
+      --line: rgba(100, 70, 50, 0.17);
+      --card: rgba(255, 255, 255, 0.025);
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Noto Serif', Georgia, serif;
+      background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(100, 40, 10, 0.3), transparent 65%), var(--ink);
+      color: var(--pg);
+      min-height: 100vh;
+      padding: 28px 16px 64px;
+    }
+
+    .container { max-width: 820px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 28px; }
+    .eyebrow {
+      display: inline-flex; font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--gold); border: 1px solid rgba(200, 146, 58, 0.3);
+      padding: 5px 16px; border-radius: 2px; margin-bottom: 14px;
+    }
+    header h1 { font-size: clamp(24px, 5vw, 36px); font-weight: 300; margin-bottom: 8px; }
+    header h1 em { font-style: italic; color: var(--gold); }
+    header p { color: var(--muted); font-size: 14px; }
+
+    .steps {
+      display: flex; gap: 10px; margin-bottom: 20px;
+    }
+    .step-tab {
+      flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--card); color: rgba(245, 237, 224, 0.55); cursor: pointer;
+      text-align: center; transition: 0.2s; font-size: 14px;
+    }
+    .step-tab.active {
+      border-color: rgba(200, 146, 58, 0.45); color: var(--pg);
+      background: rgba(200, 146, 58, 0.08);
+    }
+    .step-tab.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+    .step-tab .num {
+      display: inline-block; width: 22px; height: 22px; line-height: 22px;
+      border-radius: 50%; background: rgba(255,255,255,0.08); font-size: 12px; margin-right: 6px;
+    }
+    .step-tab.active .num { background: rgba(200, 146, 58, 0.35); }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: 22px; margin-bottom: 16px;
+    }
+    .ct {
+      font-size: 14.5px; color: rgba(245, 237, 224, 0.68); margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .badge {
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 2px; white-space: nowrap;
+    }
+    .bc { background: rgba(192, 82, 42, 0.14); color: #e07050; border: 1px solid rgba(192, 82, 42, 0.24); }
+    .bt { background: rgba(122, 74, 154, 0.14); color: #b080d0; border: 1px solid rgba(122, 74, 154, 0.24); }
+    .bdx { background: rgba(42, 90, 180, 0.12); color: #80a8e8; border: 1px solid rgba(42, 90, 180, 0.22); }
+    .bok { background: rgba(42, 122, 90, 0.14); color: #80c090; border: 1px solid rgba(42, 122, 90, 0.24); }
+
+    label, .nlb {
+      display: block; font-size: 10.5px; letter-spacing: 2px;
+      text-transform: uppercase; color: rgba(138, 112, 96, 0.65); margin-bottom: 6px;
+    }
+    .inp, input[type="url"] {
+      width: 100%; background: rgba(0, 0, 0, 0.22); border: 1px solid var(--line);
+      border-radius: 6px; padding: 10px 12px; color: var(--pg);
+      font-family: inherit; font-size: 14.5px; outline: none;
+    }
+    .inp:focus, input[type="url"]:focus {
+      border-color: rgba(200, 146, 58, 0.42); background: rgba(0, 0, 0, 0.32);
+    }
+
+    .btn-p {
+      width: 100%; padding: 15px; margin-top: 12px;
+      background: linear-gradient(135deg, #6a2010, #a83418, #6a2010); background-size: 200%;
+      border: none; border-radius: 10px; color: #faeee8;
+      font-size: 16px; font-weight: 500; letter-spacing: 1px; cursor: pointer; transition: 0.3s;
+    }
+    .btn-p:hover:not(:disabled) {
+      background-position: 100%; box-shadow: 0 7px 24px rgba(168, 52, 24, 0.28);
+    }
+    .btn-p:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-s {
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line);
+      border-radius: 8px; color: rgba(245, 237, 224, 0.55); cursor: pointer;
+      padding: 8px 14px; font-family: inherit; font-size: 13px;
+    }
+    .btn-s:hover { background: rgba(255, 255, 255, 0.09); color: var(--pg); }
+    .btn-link {
+      background: none; border: none; color: rgba(138, 112, 96, 0.7);
+      font-size: 13px; cursor: pointer; text-decoration: underline; margin-top: 10px;
+    }
+
+    .ng { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 580px) { .ng { grid-template-columns: 1fr; } }
+
+    .progress-wrap { display: none; margin-top: 16px; }
+    .progress-wrap.active { display: block; }
+    .progress-bar {
+      height: 8px; background: rgba(0,0,0,0.3); border-radius: 4px; overflow: hidden; margin-bottom: 8px;
+    }
+    .progress-fill {
+      height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold), #e0b060);
+      transition: width 0.3s;
+    }
+    .status { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .status strong { color: var(--pg); }
+
+    .alert {
+      padding: 12px 14px; border-radius: 8px; font-size: 0.9rem; margin-top: 14px; display: none;
+    }
+    .alert.error { display: block; background: rgba(200, 60, 40, 0.09); border: 1px solid rgba(200, 60, 40, 0.22); color: #e08068; }
+    .alert.success { display: block; background: rgba(60, 160, 80, 0.09); border: 1px solid rgba(60, 160, 80, 0.3); color: #80c080; }
+    .alert.info { display: block; background: rgba(42, 90, 180, 0.1); border: 1px solid rgba(42, 90, 180, 0.25); color: #90b0e8; }
+
+    .file-ready {
+      padding: 14px 16px; border-radius: 8px; margin-bottom: 14px;
+      background: rgba(42, 122, 90, 0.08); border: 1px solid rgba(42, 122, 90, 0.22);
+      font-size: 13.5px; line-height: 1.6;
+    }
+    .file-ready strong { color: #90d0a0; }
+
+    .feat-list {
+      margin-top: 10px; padding: 12px 16px; background: rgba(255,255,255,0.02);
+      border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.9; color: var(--muted);
+    }
+    .feat-list span { color: #80c080; font-weight: 600; }
+
+    .tog-row {
+      display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;
+      padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--line);
+      border-radius: 8px; margin-bottom: 10px;
+    }
+    .tog-row.ace { border-color: rgba(42, 122, 90, 0.25); background: rgba(42, 122, 90, 0.05); }
+    .tog {
+      width: 34px; height: 18px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.3); position: relative; flex-shrink: 0;
+    }
+    .tog.ogr { background: rgba(42, 122, 90, 0.55); border-color: rgba(42, 122, 90, 0.65); }
+    .tog::after {
+      content: ''; width: 12px; height: 12px; background: #fff; border-radius: 50%;
+      position: absolute; top: 2px; left: 2px; transition: 0.25s; opacity: 0.6;
+    }
+    .tog.ogr::after { left: 18px; opacity: 1; }
+    .tog-lbl { font-size: 13.5px; color: rgba(245, 237, 224, 0.7); flex: 1; }
+    .tog-sub { font-size: 11px; color: rgba(138, 112, 96, 0.55); margin-top: 2px; }
+
+    .cen-panel { border: 1px solid rgba(42, 122, 90, 0.18); border-radius: 8px; background: rgba(42, 122, 90, 0.04); overflow: hidden; margin-top: 8px; }
+    .cen-head {
+      display: grid; grid-template-columns: 22px 1fr 1fr 24px; gap: 8px; padding: 7px 12px;
+      background: rgba(42, 122, 90, 0.08); font-size: 10px; letter-spacing: 2px;
+      text-transform: uppercase; color: rgba(96, 192, 144, 0.5);
+    }
+    .cen-row {
+      display: grid; grid-template-columns: 22px 1fr 1fr 24px; gap: 8px; padding: 5px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.03); align-items: center;
+    }
+    .cen-inp {
+      width: 100%; background: rgba(0,0,0,0.15); border: 1px solid rgba(42, 122, 90, 0.15);
+      border-radius: 4px; padding: 4px 7px; color: rgba(245, 237, 224, 0.7); font-family: inherit; font-size: 13px;
+    }
+    .cen-scroll { max-height: 200px; overflow-y: auto; }
+    .btn-add-row {
+      width: 100%; padding: 8px; background: none; border: none; border-top: 1px dashed rgba(42, 122, 90, 0.22);
+      color: rgba(96, 192, 144, 0.5); cursor: pointer; font-size: 13px; font-family: inherit;
+    }
+    .btn-del { background: none; border: none; color: rgba(192, 82, 42, 0.5); cursor: pointer; font-size: 15px; }
+    .chk { width: 14px; height: 14px; accent-color: #60c090; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-top: 14px; }
+    .stat-box { background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 8px; padding: 12px; text-align: center; }
+    .stat-num { font-size: 24px; font-weight: 300; color: #90c08a; }
+    .stat-lbl { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: rgba(138, 112, 96, 0.55); margin-top: 4px; }
+
+    .warn {
+      background: rgba(200, 160, 40, 0.07); border: 1px solid rgba(200, 160, 40, 0.2);
+      border-radius: 8px; padding: 10px 14px; font-size: 13px; color: rgba(220, 180, 80, 0.75); margin-top: 12px;
+    }
+
+    footer { text-align: center; margin-top: 20px; font-size: 12px; color: rgba(138, 112, 96, 0.5); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="eyebrow">✦ Công Cụ Đam Mỹ ✦</div>
+      <h1>Tải Truyện & <em>Change Version</em></h1>
+      <p>Bước 1: Tải truyện từ web · Bước 2: Đổi tên nhân vật · Tải file HTML</p>
+    </header>
+
+    <div class="steps">
+      <div class="step-tab active" id="tabDownload" data-panel="panelDownload">
+        <span class="num">1</span> Tải truyện
+      </div>
+      <div class="step-tab disabled" id="tabVersion" data-panel="panelVersion">
+        <span class="num">2</span> Chuyển version
+      </div>
+    </div>
+
+    <!-- BƯỚC 1: TẢI TRUYỆN -->
+    <div class="panel active" id="panelDownload">
+      <div class="card">
+        <div class="ct"><span class="badge bdx">📥 TẢI</span> Nhập link truyện</div>
+        <label for="storyUrl">Link truyện</label>
+        <input type="url" id="storyUrl"
+          placeholder="https://truyenfull.today/ten-truyen/"
+          value="https://truyenfull.today/sinh-ton-noi-hoang-da-toi-chi-muon-hai-thuoc-thoi-ma">
+        <button class="btn-p" id="btnDownload">Bắt Đầu Tải Về</button>
+
+        <div id="alertDownload" class="alert"></div>
+
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <div class="status" id="statusText">Đang chuẩn bị...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BƯỚC 2: CHUYỂN VERSION -->
+    <div class="panel" id="panelVersion">
+      <div id="versionNoFile" class="card">
+        <div class="warn">Chưa có file truyện. Vui lòng hoàn thành <strong>Bước 1: Tải truyện</strong> trước.</div>
+      </div>
+
+      <div id="versionForm" style="display:none;">
+        <div class="file-ready" id="fileReadyInfo"></div>
+
+        <div class="card">
+          <div class="ct"><span class="badge bc">✦ NHÂN VẬT</span> Tên cũ → Tên mới</div>
+          <div class="ng">
+            <div>
+              <div style="margin-bottom:10px"><span class="badge bc">CÔNG</span></div>
+              <label class="nlb">Tên cũ (đầy đủ)</label>
+              <input class="inp" id="congOld" placeholder="VD: Cố Diệp Thụ / Úc Trạch" style="margin-bottom:8px">
+              <label class="nlb">Tên mới (đầy đủ)</label>
+              <input class="inp" id="congNew" placeholder="VD: Vương Nhất Bác" value="Vương Nhất Bác">
+            </div>
+            <div>
+              <div style="margin-bottom:10px"><span class="badge bt">THỤ</span></div>
+              <label class="nlb">Tên cũ (đầy đủ)</label>
+              <input class="inp" id="thuOld" placeholder="VD: Tần Minh / Thẩm Lam" style="margin-bottom:8px">
+              <label class="nlb">Tên mới (đầy đủ)</label>
+              <input class="inp" id="thuNew" placeholder="VD: Tiêu Chiến" value="Tiêu Chiến">
+            </div>
+          </div>
+          <div class="feat-list">
+            <div><span>✓</span> Đổi tên đầy đủ (không phân biệt hoa/thường)</div>
+            <div><span>✓</span> Đổi danh xưng theo họ: Tần tổng, Anh Tần, gia đình Tần...</div>
+            <div><span>✓</span> Đổi nickname: Tiểu Sơn, A Sơn, Sơn Sơn...</div>
+            <div><span>✓</span> Quét họ đơn lẻ còn sót</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="tog-row ace" id="togCen">
+            <div class="tog ogr" id="togCenSwitch"></div>
+            <div>
+              <div class="tog-lbl">🔓 Khôi phục từ bị *** <span id="cenCountLabel" style="font-size:11px;color:rgba(138,112,96,.55)"></span></div>
+              <div class="tog-sub">Tự động khôi phục: l**m→liếm, đ*t→địt, r*n r*→rên rỉ...</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:6px">
+            <button class="btn-s" id="btnCenAll" type="button">Bật tất cả</button>
+            <button class="btn-s" id="btnCenNone" type="button">Tắt tất cả</button>
+            <button class="btn-s" id="btnCenToggle" type="button">▼ Xem & sửa danh sách</button>
+          </div>
+          <div id="cenPanel" style="display:none;"></div>
+        </div>
+
+        <button class="btn-p" id="btnApplyVersion" disabled>✦ Chuyển Version & Tải File HTML Về ✦</button>
+        <div id="alertVersion" class="alert"></div>
+        <div id="versionResult"></div>
+      </div>
+    </div>
+
+    <footer>Express + Cheerio · Xuất HTML giữ nguyên đoạn văn như truyenfull</footer>
+  </div>
+
+  <script src="change-version.js"></script>
+  <script>
+    const API_BASE = window.location.origin;
+    const $ = (id) => document.getElementById(id);
+
+    const appState = {
+      downloaded: null,
+      useCen: true,
+      showCenList: false,
+      cenList: ChangeVersion.createDefaultCenList(),
+      processing: false,
+    };
+
+    function showAlert(elId, message, type) {
+      const el = $(elId);
+      el.textContent = message;
+      el.className = `alert ${type}`;
+    }
+    function hideAlert(elId) {
+      $(elId).className = 'alert';
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function sanitizeFilename(name) {
+      return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'truyen';
+    }
+
+    function switchTab(panelId) {
+      document.querySelectorAll('.step-tab').forEach((t) => {
+        t.classList.toggle('active', t.dataset.panel === panelId);
+      });
+      document.querySelectorAll('.panel').forEach((p) => {
+        p.classList.toggle('active', p.id === panelId);
+      });
+    }
+
+    function enableVersionTab() {
+      $('tabVersion').classList.remove('disabled');
+    }
+
+    function getPlainTextLength() {
+      if (!appState.downloaded) return 0;
+      return appState.downloaded.chapters.reduce((sum, ch) => {
+        return sum + ch.content.replace(/<[^>]+>/g, '').length;
+      }, 0);
+    }
+
+    function updateFileReadyInfo() {
+      if (!appState.downloaded) return;
+      const d = appState.downloaded;
+      $('fileReadyInfo').innerHTML =
+        `<strong>✓ File truyện đã sẵn sàng</strong><br>` +
+        `Tên: <em>${escapeHtml(d.title)}</em> · ${d.chapters.length} chương · ` +
+        `${getPlainTextLength().toLocaleString()} ký tự`;
+      $('versionNoFile').style.display = 'none';
+      $('versionForm').style.display = 'block';
+      updateVersionButton();
+    }
+
+    function buildHtmlDocument(storyTitle, chapters) {
+      const bodyChapters = chapters.map((ch) => `
+  <section class="chapter-block">
+    <h2 class="chapter-title">${escapeHtml(ch.title)}</h2>
+    <div class="chapter-c">${ch.content}</div>
+  </section>`).join('\n');
+
+      return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(storyTitle)}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Palatino Linotype", Palatino, "Noto Serif", Georgia, serif;
+  font-size: 20px;
+  line-height: 1.9;
+  color: #2c2c2c;
+  background: #f4f1ea;
+  padding: 24px 16px 64px;
+}
+.wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #e0dcd4;
+  border-radius: 4px;
+  padding: 40px 48px 56px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.book-title {
+  text-align: center;
+  font-size: 1.6em;
+  font-weight: 600;
+  margin-bottom: 48px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e8e4dc;
+  color: #1a1a1a;
+}
+.chapter-block { margin-bottom: 48px; }
+.chapter-block:last-child { margin-bottom: 0; }
+.chapter-title {
+  font-size: 1.15em;
+  font-weight: 600;
+  color: #8b4513;
+  margin-bottom: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #ddd;
+}
+.chapter-c p {
+  text-indent: 2em;
+  margin: 0.6em 0;
+  text-align: justify;
+}
+@media (max-width: 600px) {
+  .wrap { padding: 24px 20px 40px; }
+  body { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="book-title">${escapeHtml(storyTitle)}</h1>
+${bodyChapters}
+</div>
+</body>
+</html>`;
+    }
+
+    function downloadHtmlFile(html, filename) {
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sanitizeFilename(filename)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function updateProgress(current, total, message) {
+      const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+      $('progressFill').style.width = `${pct}%`;
+      $('statusText').innerHTML = message;
+    }
+
+    async function fetchStoryInfo(url) {
+      const res = await fetch(`${API_BASE}/api/story-info?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lỗi lấy thông tin truyện');
+      return data;
+    }
+
+    async function fetchChapter(url) {
+      const res = await fetch(`${API_BASE}/api/chapter?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lỗi lấy nội dung chương');
+      return data;
+    }
+
+    async function startDownload() {
+      const url = $('storyUrl').value.trim();
+      if (!url) {
+        showAlert('alertDownload', 'Vui lòng nhập link truyện.', 'error');
+        return;
+      }
+
+      hideAlert('alertDownload');
+      $('btnDownload').disabled = true;
+      $('progressWrap').classList.add('active');
+
+      try {
+        updateProgress(0, 100, 'Đang lấy danh sách chương...');
+        const storyInfo = await fetchStoryInfo(url);
+        const { title, chapters } = storyInfo;
+
+        updateProgress(0, chapters.length, `<strong>${escapeHtml(title)}</strong> — ${chapters.length} chương`);
+
+        const downloaded = [];
+        for (let i = 0; i < chapters.length; i++) {
+          const ch = chapters[i];
+          updateProgress(
+            i, chapters.length,
+            `Đang tải chương <strong>${i + 1}/${chapters.length}</strong>: ${escapeHtml(ch.title)}`
+          );
+          const chapterData = await fetchChapter(ch.url);
+          downloaded.push({
+            title: chapterData.title || ch.title,
+            content: chapterData.content,
+          });
+          await new Promise((r) => setTimeout(r, 300));
+        }
+
+        updateProgress(chapters.length, chapters.length, 'Đã tải xong — chuyển sang Bước 2...');
+
+        appState.downloaded = { title, chapters: downloaded };
+        enableVersionTab();
+        updateFileReadyInfo();
+
+        showAlert(
+          'alertDownload',
+          `Đã tải xong ${chapters.length} chương. Chuyển sang tab "Chuyển version" để đổi tên và tải file.`,
+          'success'
+        );
+
+        setTimeout(() => switchTab('panelVersion'), 600);
+      } catch (err) {
+        console.error(err);
+        showAlert('alertDownload', err.message || 'Có lỗi xảy ra khi tải truyện.', 'error');
+        $('progressWrap').classList.remove('active');
+      } finally {
+        $('btnDownload').disabled = false;
+      }
+    }
+
+    function getVersionOptions() {
+      return {
+        cong: { old: $('congOld').value, new: $('congNew').value },
+        thu: { old: $('thuOld').value, new: $('thuNew').value },
+        useCen: appState.useCen,
+        cenList: appState.cenList,
+      };
+    }
+
+    function updateVersionButton() {
+      const opts = getVersionOptions();
+      const ok = appState.downloaded &&
+        opts.cong.old.trim() && opts.cong.new.trim() &&
+        opts.thu.old.trim() && opts.thu.new.trim() &&
+        !appState.processing;
+      $('btnApplyVersion').disabled = !ok;
+    }
+
+    function renderCenPanel() {
+      const panel = $('cenPanel');
+      if (!appState.showCenList) {
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = 'block';
+      panel.innerHTML = `
+        <div class="cen-panel">
+          <div class="cen-head"><span></span><span>Từ bị ***</span><span>Khôi phục thành</span><span></span></div>
+          <div class="cen-scroll" id="cenRows"></div>
+          <button class="btn-add-row" type="button" id="btnCenAdd">+ Thêm từ mới</button>
+        </div>`;
+
+      const rows = $('cenRows');
+      appState.cenList.forEach((c, idx) => {
+        const row = document.createElement('div');
+        row.className = 'cen-row';
+        row.innerHTML = `
+          <input type="checkbox" class="chk" ${c.on ? 'checked' : ''}>
+          <input class="cen-inp" value="${escapeHtml(c.find)}" placeholder="từ bị ***">
+          <input class="cen-inp" value="${escapeHtml(c.replace)}" placeholder="từ gốc">
+          <button class="btn-del" type="button">×</button>`;
+        row.querySelector('.chk').onchange = (e) => { appState.cenList[idx].on = e.target.checked; updateCenLabel(); };
+        row.querySelectorAll('.cen-inp')[0].oninput = (e) => { appState.cenList[idx].find = e.target.value; };
+        row.querySelectorAll('.cen-inp')[1].oninput = (e) => { appState.cenList[idx].replace = e.target.value; };
+        row.querySelector('.btn-del').onclick = () => { appState.cenList.splice(idx, 1); renderCenPanel(); updateCenLabel(); };
+        rows.appendChild(row);
+      });
+
+      $('btnCenAdd').onclick = () => {
+        appState.cenList.push({ id: Date.now(), find: '', replace: '', on: true });
+        renderCenPanel();
+        updateCenLabel();
+      };
+    }
+
+    function updateCenLabel() {
+      const on = appState.cenList.filter((c) => c.on).length;
+      $('cenCountLabel').textContent = `— ${on}/${appState.cenList.length} từ bật`;
+      $('togCenSwitch').classList.toggle('ogr', appState.useCen);
+      $('togCen').classList.toggle('ace', appState.useCen);
+    }
+
+    function applyChangeVersion() {
+      if (!appState.downloaded) return;
+      const opts = getVersionOptions();
+      if (!opts.cong.old.trim() || !opts.cong.new.trim() || !opts.thu.old.trim() || !opts.thu.new.trim()) {
+        showAlert('alertVersion', 'Vui lòng nhập đủ tên Công và Thụ.', 'error');
+        return;
+      }
+
+      appState.processing = true;
+      updateVersionButton();
+      hideAlert('alertVersion');
+      $('versionResult').innerHTML = '<div class="card"><div class="status">Đang chuyển version...</div></div>';
+
+      setTimeout(() => {
+        try {
+          const allStats = [];
+          const totalByType = { cen: 0, st: 0, cong: 0, thu: 0, ss: 0 };
+
+          const changedChapters = appState.downloaded.chapters.map((ch) => {
+            const titleResult = ChangeVersion.applyReplacementsToText(ch.title, opts);
+            const contentResult = ChangeVersion.applyReplacementsToText(ch.content, opts);
+            titleResult.stats.forEach((s) => {
+              allStats.push(s);
+              totalByType[s.type] = (totalByType[s.type] || 0) + s.n;
+            });
+            contentResult.stats.forEach((s) => {
+              allStats.push(s);
+              totalByType[s.type] = (totalByType[s.type] || 0) + s.n;
+            });
+            return { title: titleResult.text, content: contentResult.text };
+          });
+
+          const fullChanged = changedChapters.map((c) => c.content).join(' ');
+          const remaining = [];
+          const congS = ChangeVersion.getSurname(opts.cong.old);
+          const thuS = ChangeVersion.getSurname(opts.thu.old);
+          if (congS) {
+            const c1 = ChangeVersion.countOcc(fullChanged, congS, true);
+            if (c1 > 0) remaining.push({ s: congS, cnt: c1, label: 'Công' });
+          }
+          if (thuS) {
+            const c2 = ChangeVersion.countOcc(fullChanged, thuS, true);
+            if (c2 > 0) remaining.push({ s: thuS, cnt: c2, label: 'Thụ' });
+          }
+
+          const outTitle = `${appState.downloaded.title}_BJYX`;
+          const htmlDoc = buildHtmlDocument(appState.downloaded.title, changedChapters);
+          downloadHtmlFile(htmlDoc, outTitle);
+
+          let tot = 0;
+          Object.values(totalByType).forEach((v) => { tot += v; });
+
+          let resultHtml = `<div class="card"><div class="alert success">✓ Đã chuyển version và tải file <strong>${escapeHtml(outTitle)}.html</strong></div>`;
+          resultHtml += `<div class="stat-grid">
+            <div class="stat-box"><div class="stat-num">${tot}</div><div class="stat-lbl">Tổng lượt</div></div>`;
+          if (totalByType.cen) resultHtml += `<div class="stat-box"><div class="stat-num">${totalByType.cen}</div><div class="stat-lbl">Từ KD</div></div>`;
+          if (totalByType.st) resultHtml += `<div class="stat-box"><div class="stat-num">${totalByType.st}</div><div class="stat-lbl">Danh xưng</div></div>`;
+          if (totalByType.cong) resultHtml += `<div class="stat-box"><div class="stat-num">${totalByType.cong}</div><div class="stat-lbl">Công</div></div>`;
+          if (totalByType.thu) resultHtml += `<div class="stat-box"><div class="stat-num">${totalByType.thu}</div><div class="stat-lbl">Thụ</div></div>`;
+          if (totalByType.ss) resultHtml += `<div class="stat-box"><div class="stat-num">${totalByType.ss}</div><div class="stat-lbl">Họ đơn lẻ</div></div>`;
+          resultHtml += '</div>';
+
+          if (remaining.length) {
+            resultHtml += '<div class="warn">⚠️ Họ cũ còn sót: ';
+            remaining.forEach((r, i) => {
+              resultHtml += `${r.s} (${r.label}) còn ${r.cnt} lần`;
+              if (i < remaining.length - 1) resultHtml += ' · ';
+            });
+            resultHtml += ' — Kiểm tra thủ công.</div>';
+          }
+          resultHtml += '</div>';
+
+          $('versionResult').innerHTML = resultHtml;
+          showAlert('alertVersion', 'File HTML đã được tải về thành công!', 'success');
+        } catch (err) {
+          showAlert('alertVersion', err.message || 'Lỗi khi chuyển version.', 'error');
+          $('versionResult').innerHTML = '';
+        } finally {
+          appState.processing = false;
+          updateVersionButton();
+        }
+      }, 50);
+    }
+
+    document.querySelectorAll('.step-tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        if (tab.classList.contains('disabled')) return;
+        switchTab(tab.dataset.panel);
+      });
+    });
+
+    $('btnDownload').addEventListener('click', startDownload);
+    $('btnApplyVersion').addEventListener('click', applyChangeVersion);
+
+    ['congOld', 'congNew', 'thuOld', 'thuNew'].forEach((id) => {
+      $(id).addEventListener('input', updateVersionButton);
+    });
+
+    $('togCen').addEventListener('click', () => {
+      appState.useCen = !appState.useCen;
+      updateCenLabel();
+    });
+    $('btnCenAll').addEventListener('click', () => {
+      appState.cenList.forEach((c) => { c.on = true; });
+      renderCenPanel();
+      updateCenLabel();
+    });
+    $('btnCenNone').addEventListener('click', () => {
+      appState.cenList.forEach((c) => { c.on = false; });
+      renderCenPanel();
+      updateCenLabel();
+    });
+    $('btnCenToggle').addEventListener('click', () => {
+      appState.showCenList = !appState.showCenList;
+      $('btnCenToggle').textContent = appState.showCenList ? '▲ Thu gọn' : '▼ Xem & sửa danh sách';
+      renderCenPanel();
+    });
+
+    updateCenLabel();
+  </script>
+</body>
+</html>
