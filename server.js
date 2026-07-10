@@ -40,13 +40,27 @@ async function fetchHtml(url, referer) {
   return response.data;
 }
 
+function detectSite(url) {
+  const host = new URL(url).hostname.toLowerCase();
+  if (host.includes('dammy.me')) return 'dammy';
+  if (host.includes('truyenfull')) return 'truyenfull';
+  return 'generic';
+}
+
 function normalizeStoryUrl(rawUrl) {
   const parsed = new URL(rawUrl.trim());
   let pathname = parsed.pathname.replace(/\/+$/, '');
   if (!pathname) {
     throw new Error('URL không hợp lệ');
   }
+  if (pathname.endsWith('.html')) {
+    return `${parsed.origin}${pathname}`;
+  }
   return `${parsed.origin}${pathname}/`;
+}
+
+function normalizeChapterUrl(rawUrl) {
+  return rawUrl.trim();
 }
 
 function toAbsoluteUrl(baseUrl, href) {
@@ -89,6 +103,163 @@ function collectChapterLinks($, baseUrl, chapters, seen) {
     seen.add(href);
     chapters.push({ title, url: href });
   });
+}
+
+function collectDammyChapterLinks($, baseUrl) {
+  const chapters = [];
+  const seen = new Set();
+
+  $('.list-chapters a').each((_, el) => {
+    const href = $(el).attr('href');
+    if (!href || !/chuong-\d+/i.test(href)) return;
+
+    const title = $(el).text().replace(/\s+/g, ' ').trim();
+    const abs = toAbsoluteUrl(baseUrl, href);
+    if (!title || seen.has(abs)) return;
+
+    seen.add(abs);
+    chapters.push({ title, url: abs });
+  });
+
+  chapters.reverse();
+  return chapters;
+}
+
+function getStoryTitle($, site) {
+  if (site === 'dammy') {
+    return (
+      $('h2.card-title[itemprop="name"]').first().text().trim() ||
+      $('h1 span[itemprop="name"]').first().text().trim() ||
+      $('h1').first().text().trim() ||
+      $('title').text().split('-')[0].trim()
+    );
+  }
+
+  return (
+    $('h3.title, h1.title').first().text().trim() ||
+    $('title').text().split('-')[0].trim()
+  );
+}
+
+function cleanDammyContentHtml($, contentEl) {
+  contentEl.find('script, style, iframe, input, button, form').remove();
+  contentEl.find('span').each((_, el) => {
+    const $el = $(el);
+    if (!$el.text().trim() && $el.children().length === 0) {
+      $el.remove();
+    }
+  });
+}
+
+function extractParagraphsFromContent($, contentEl) {
+  const paragraphs = [];
+  contentEl.find('p').each((_, el) => {
+    const text = $(el).text().replace(/\s+/g, ' ').trim();
+    if (text) {
+      paragraphs.push(`<p>${escapeHtml(text)}</p>`);
+    }
+  });
+  return paragraphs;
+}
+
+function extractTruyenfullChapterContent($) {
+  const contentEl = $('#chapter-c, .chapter-c').first().clone();
+  if (!contentEl.length) {
+    throw new Error('Không tìm thấy nội dung chương (#chapter-c)');
+  }
+
+  contentEl.find(
+    'script, style, iframe, [id^="ads-"], .ads-content, .adsbygoogle, .ads-chapter-box, .incontent-ad, .ads-responsive'
+  ).remove();
+
+  const paragraphs = extractParagraphsFromContent($, contentEl);
+  if (paragraphs.length) {
+    return paragraphs.join('\n');
+  }
+
+  const rawText = contentEl.text().replace(/\s+/g, ' ').trim();
+  return rawText ? `<p>${escapeHtml(rawText)}</p>` : '';
+}
+
+function extractDammyChapterContent($) {
+  const contentEl = $('#chapter-content-render, .chapter-content').first().clone();
+  if (!contentEl.length) {
+    throw new Error('Không tìm thấy nội dung chương (.chapter-content)');
+  }
+
+  cleanDammyContentHtml($, contentEl);
+
+  const paragraphs = extractParagraphsFromContent($, contentEl);
+  if (paragraphs.length) {
+    return paragraphs.join('\n');
+  }
+
+  const rawText = contentEl.text().replace(/\s+/g, ' ').trim();
+  return rawText ? `<p>${escapeHtml(rawText)}</p>` : '';
+}
+
+function extractChapterContent($, site) {
+  if (site === 'dammy') {
+    return extractDammyChapterContent($);
+  }
+  return extractTruyenfullChapterContent($);
+}
+
+function getChapterTitle($, site) {
+  if (site === 'dammy') {
+    return (
+      $('#chapter_title').attr('value')?.trim() ||
+      $('h1.card-title').text().split(' - ').slice(-1)[0]?.trim() ||
+      $('.breadcrumb-item.active').text().trim() ||
+      $('title').text().split('-')[1]?.trim()
+    );
+  }
+
+  return (
+    $('.chapter-title, .chapter-c-title, h2').first().text().trim() ||
+    $('title').text().split(':').slice(-1)[0].trim()
+  );
+}
+
+async function fetchDammyStoryInfo(storyUrl, $) {
+  const title = getStoryTitle($, 'dammy');
+  const chapters = collectDammyChapterLinks($, storyUrl);
+
+  if (!chapters.length) {
+    throw new Error('Không tìm thấy danh sách chương trên dammy.me');
+  }
+
+  return {
+    title,
+    totalChapters: chapters.length,
+    totalPages: 1,
+    chapters,
+  };
+}
+
+async function fetchTruyenfullStoryInfo(storyUrl, $) {
+  const title = getStoryTitle($, 'truyenfull');
+
+  let chapters = await fetchChaptersViaAjax(storyUrl, $, title);
+  if (!chapters || chapters.length === 0) {
+    chapters = await fetchChaptersViaPagination(storyUrl, $);
+  }
+
+  if (!chapters.length) {
+    throw new Error('Không tìm thấy danh sách chương');
+  }
+
+  const maxPage = Math.max(
+    parseInt($('#total-page').attr('value') || '1', 10),
+    getMaxPageFromPagination($)
+  );
+
+  return {
+    title,
+    totalChapters: chapters.length,
+    totalPages: maxPage,
+    chapters,
+  };
 }
 
 function getAjaxBase(origin) {
@@ -173,32 +344,6 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;');
 }
 
-function extractChapterContent($) {
-  const contentEl = $('#chapter-c, .chapter-c').first().clone();
-  if (!contentEl.length) {
-    throw new Error('Không tìm thấy nội dung chương (#chapter-c)');
-  }
-
-  contentEl.find(
-    'script, style, iframe, [id^="ads-"], .ads-content, .adsbygoogle, .ads-chapter-box, .incontent-ad, .ads-responsive'
-  ).remove();
-
-  const paragraphs = [];
-  contentEl.find('p').each((_, el) => {
-    const inner = $(el).html()?.replace(/\s+/g, ' ').trim();
-    if (inner) {
-      paragraphs.push(`<p>${inner}</p>`);
-    }
-  });
-
-  if (paragraphs.length) {
-    return paragraphs.join('\n');
-  }
-
-  const rawText = contentEl.text().replace(/\s+/g, ' ').trim();
-  return rawText ? `<p>${escapeHtml(rawText)}</p>` : '';
-}
-
 app.get('/api/story-info', async (req, res) => {
   try {
     const { url } = req.query;
@@ -207,33 +352,16 @@ app.get('/api/story-info', async (req, res) => {
     }
 
     const storyUrl = normalizeStoryUrl(url);
+    const site = detectSite(storyUrl);
     const html = await fetchHtml(storyUrl);
     const $ = cheerio.load(html);
 
-    const title =
-      $('h3.title, h1.title').first().text().trim() ||
-      $('title').text().split('-')[0].trim();
+    const result =
+      site === 'dammy'
+        ? await fetchDammyStoryInfo(storyUrl, $)
+        : await fetchTruyenfullStoryInfo(storyUrl, $);
 
-    let chapters = await fetchChaptersViaAjax(storyUrl, $, title);
-    if (!chapters || chapters.length === 0) {
-      chapters = await fetchChaptersViaPagination(storyUrl, $);
-    }
-
-    if (!chapters.length) {
-      return res.status(404).json({ error: 'Không tìm thấy danh sách chương' });
-    }
-
-    const maxPage = Math.max(
-      parseInt($('#total-page').attr('value') || '1', 10),
-      getMaxPageFromPagination($)
-    );
-
-    res.json({
-      title,
-      totalChapters: chapters.length,
-      totalPages: maxPage,
-      chapters,
-    });
+    res.json(result);
   } catch (error) {
     console.error('story-info error:', error.message);
     res.status(500).json({
@@ -249,15 +377,13 @@ app.get('/api/chapter', async (req, res) => {
       return res.status(400).json({ error: 'Thiếu tham số url' });
     }
 
-    const chapterUrl = url.trim();
+    const chapterUrl = normalizeChapterUrl(url);
+    const site = detectSite(chapterUrl);
     const html = await fetchHtml(chapterUrl);
     const $ = cheerio.load(html);
 
-    const title =
-      $('.chapter-title, .chapter-c-title, h2').first().text().trim() ||
-      $('title').text().split(':').slice(-1)[0].trim();
-
-    const content = extractChapterContent($);
+    const title = getChapterTitle($, site);
+    const content = extractChapterContent($, site);
 
     res.json({ title, content });
   } catch (error) {
