@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Download and Change">
+  <defs>
+    <linearGradient id="gGold" x1="10" y1="10" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0E2A8"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#8A7020"/>
+    </linearGradient>
+    <linearGradient id="gSilver" x1="40" y1="14" x2="18" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F4F6F8"/>
+      <stop offset="100%" stop-color="#8B95A5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0C0D10"/>
+  <!-- Download chevron -->
+  <path d="M32 12v26m0 0l-10-10m10 10l10-10" stroke="url(#gGold)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Change / swap arc -->
+  <path d="M16 46c4 6 12 10 16 10s12-4 16-10" stroke="url(#gSilver)" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <path d="M44 40l4 6-6 2" stroke="url(#gSilver)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

@@ -5,5 +5,20 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# local / portable tooling
+.node-portable/
+.superpowers/
+
+# sample & probe artifacts
 _chap_sample.html
 _peek.js
+_sample_alpha.pdf
+_*.pdf
+_*.html
+_*.js
+_*.json
+_*.txt
+chapter-out.json
+story-info-out.json
+Change_Version_Novel*.html

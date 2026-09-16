@@ -1,6 +1,6 @@
-# Novel Downloader
+# Download and Change
 
-Tải truyện từ web → Chuyển version tên nhân vật → Xuất file HTML.
+Tải nội dung từ web, `.docx` hoặc `.pdf` → Đổi tên nhân vật → Xuất file HTML.
 
 ## Chạy local
 

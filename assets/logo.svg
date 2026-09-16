@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Download and Change">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22252B"/>
+      <stop offset="100%" stop-color="#0C0D10"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="18" y1="8" x2="46" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0E2A8"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#8A7020"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="40" y1="20" x2="14" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F4F6F8"/>
+      <stop offset="100%" stop-color="#8B95A5"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <path d="M32 11v27" stroke="url(#gold)" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M21 28l11 12 11-12" stroke="url(#gold)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M15 47c5.5 7 12.5 10 17 10s11.5-3 17-10" stroke="url(#silver)" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <path d="M43 40.5l6 6.5-7.5 1.5" stroke="url(#silver)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
