@@ -1235,7 +1235,13 @@ app.get('/api/chapter', async (req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'novel-downloader', env: process.env.NODE_ENV || 'development' });
+  res.json({
+    ok: true,
+    service: 'novel-downloader',
+    env: process.env.NODE_ENV || 'development',
+    adminConfigured: Boolean(ADMIN_PASS),
+    commitHint: 'admin-pass-default-v1',
+  });
 });
 
 app.post('/api/feedback', (req, res) => {
