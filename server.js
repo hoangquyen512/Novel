@@ -3,6 +3,8 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { URL } = require('url');
 const {
   isWordpressHost,
@@ -10,16 +12,150 @@ const {
   fetchWordpressChapter,
 } = require('./wordpress');
 const { extractDammyChapterContent: extractDammyChapterContentCore } = require('./dammy');
+const feedbackStore = require('./feedback-store');
+
+// Load .env (local) without extra dependency
+(function loadDotEnv() {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (!fs.existsSync(envPath)) return;
+    for (const raw of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq <= 0) continue;
+      const key = line.slice(0, eq).trim();
+      if (!key || process.env[key] != null) continue;
+      let val = line.slice(eq + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      process.env[key] = val;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+})();
 
 const app = express();
 const PORT = process.env.PORT || 3456;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.set('trust proxy', 1);
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json({ limit: '32kb' }));
 express.static.mime.define({ 'application/javascript': ['mjs'] });
 app.use(express.static(path.join(__dirname)));
+
+const FEEDBACK_MAX_MESSAGE = 5000;
+const feedbackRateMap = new Map();
+const ADMIN_USER = (process.env.ADMIN_USER || 'admin').trim();
+const ADMIN_PASS = (process.env.ADMIN_PASS || '').trim();
+const ADMIN_SESSION_SECRET = (
+  process.env.ADMIN_SESSION_SECRET ||
+  crypto.randomBytes(24).toString('hex')
+).trim();
+const ADMIN_COOKIE = 'dac_admin';
+const ADMIN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function checkFeedbackRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+  const maxHits = 8;
+  const entry = feedbackRateMap.get(ip) || { hits: [] };
+  entry.hits = entry.hits.filter((t) => now - t < windowMs);
+  if (entry.hits.length >= maxHits) {
+    feedbackRateMap.set(ip, entry);
+    return false;
+  }
+  entry.hits.push(now);
+  feedbackRateMap.set(ip, entry);
+  return true;
+}
+
+function timingSafeEqualStr(a, b) {
+  const aa = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (aa.length !== bb.length) return false;
+  return crypto.timingSafeEqual(aa, bb);
+}
+
+function signAdminToken(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', ADMIN_SESSION_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function verifyAdminToken(token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const [body, sig] = token.split('.');
+  const expected = crypto.createHmac('sha256', ADMIN_SESSION_SECRET).update(body).digest('base64url');
+  if (!timingSafeEqualStr(sig, expected)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (!payload || payload.exp < Date.now()) return null;
+    if (payload.u !== ADMIN_USER) return null;
+    return payload;
+  } catch (_) {
+    return null;
+  }
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const out = {};
+  header.split(';').forEach((part) => {
+    const i = part.indexOf('=');
+    if (i < 0) return;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  });
+  return out;
+}
+
+function setAdminCookie(res, token) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${ADMIN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(ADMIN_SESSION_TTL_MS / 1000)}${secure}`
+  );
+}
+
+function clearAdminCookie(res) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${ADMIN_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
+  );
+}
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_PASS) {
+    return res.status(503).json({
+      ok: false,
+      error: 'Chưa cấu hình ADMIN_PASS trên server.',
+    });
+  }
+  const cookies = parseCookies(req);
+  const payload = verifyAdminToken(cookies[ADMIN_COOKIE]);
+  if (!payload) {
+    return res.status(401).json({ ok: false, error: 'Chưa đăng nhập admin.' });
+  }
+  req.admin = payload;
+  return next();
+}
 
 const BROWSER_HEADERS = {
   'User-Agent':
@@ -1099,6 +1235,121 @@ app.get('/api/chapter', async (req, res) => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'novel-downloader', env: process.env.NODE_ENV || 'development' });
+});
+
+app.post('/api/feedback', (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    if (!checkFeedbackRateLimit(ip)) {
+      return res.status(429).json({
+        ok: false,
+        error: 'Bạn đã gửi quá nhiều phản hồi. Thử lại sau khoảng 1 giờ.',
+      });
+    }
+
+    const typeValue = String(req.body?.type || 'bug').trim();
+    const message = String(req.body?.message || '').trim();
+    const contact = String(req.body?.contact || '').trim().slice(0, 200);
+    const version = String(req.body?.version || '').trim().slice(0, 40);
+    const pageUrl = String(req.body?.pageUrl || '').trim().slice(0, 500);
+    const userAgent = String(req.body?.userAgent || req.headers['user-agent'] || '')
+      .trim()
+      .slice(0, 200);
+
+    if (!message) {
+      return res.status(400).json({ ok: false, error: 'Vui lòng nhập nội dung.' });
+    }
+    if (message.length > FEEDBACK_MAX_MESSAGE) {
+      return res.status(400).json({
+        ok: false,
+        error: `Nội dung tối đa ${FEEDBACK_MAX_MESSAGE} ký tự.`,
+      });
+    }
+    if (typeValue !== 'bug' && typeValue !== 'idea') {
+      return res.status(400).json({ ok: false, error: 'Loại phản hồi không hợp lệ.' });
+    }
+
+    const item = feedbackStore.createFeedback({
+      type: typeValue,
+      message,
+      contact,
+      version,
+      pageUrl,
+      userAgent,
+      ip,
+    });
+
+    return res.json({ ok: true, id: item.id });
+  } catch (error) {
+    console.error('Feedback save failed:', error.message || error);
+    return res.status(500).json({
+      ok: false,
+      error: 'Không lưu được phản hồi. Thử lại sau.',
+    });
+  }
+});
+
+app.post('/api/admin/login', (req, res) => {
+  if (!ADMIN_PASS) {
+    return res.status(503).json({
+      ok: false,
+      error: 'Chưa cấu hình ADMIN_PASS trên server.',
+    });
+  }
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '');
+  if (!timingSafeEqualStr(username, ADMIN_USER) || !timingSafeEqualStr(password, ADMIN_PASS)) {
+    return res.status(401).json({ ok: false, error: 'Sai tài khoản hoặc mật khẩu.' });
+  }
+  const token = signAdminToken({
+    u: ADMIN_USER,
+    exp: Date.now() + ADMIN_SESSION_TTL_MS,
+  });
+  setAdminCookie(res, token);
+  return res.json({ ok: true, user: ADMIN_USER });
+});
+
+app.post('/api/admin/logout', (_req, res) => {
+  clearAdminCookie(res);
+  return res.json({ ok: true });
+});
+
+app.get('/api/admin/me', requireAdmin, (req, res) => {
+  return res.json({ ok: true, user: req.admin.u });
+});
+
+app.get('/api/admin/feedback', requireAdmin, (req, res) => {
+  try {
+    const items = feedbackStore.listFeedback({
+      status: String(req.query.status || '').trim(),
+      type: String(req.query.type || '').trim(),
+      from: String(req.query.from || '').trim(),
+      to: String(req.query.to || '').trim(),
+      q: String(req.query.q || '').trim(),
+    });
+    return res.json({ ok: true, items, total: items.length });
+  } catch (error) {
+    console.error('Admin list feedback failed:', error.message || error);
+    return res.status(500).json({ ok: false, error: 'Không đọc được log.' });
+  }
+});
+
+app.patch('/api/admin/feedback/:id', requireAdmin, (req, res) => {
+  try {
+    const status = String(req.body?.status || '').trim();
+    const result = feedbackStore.setStatus(req.params.id, status);
+    if (!result.ok) {
+      return res.status(404).json(result);
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error('Admin update feedback failed:', error.message || error);
+    return res.status(500).json({ ok: false, error: 'Không cập nhật được trạng thái.' });
+  }
+});
+
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
 app.get('/', (_req, res) => {

@@ -471,6 +471,105 @@
       color: var(--accent-2, #e8d48b);
       font-weight: 600;
     }
+    footer .credit-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    footer .credit-actions .btn-feedback {
+      background: transparent;
+      border: 1px solid rgba(212, 175, 55, 0.35);
+      color: var(--accent-2, #e8d48b);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.18s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    footer .credit-actions .btn-feedback:hover {
+      background: var(--accent-soft);
+      border-color: rgba(212, 175, 55, 0.55);
+      color: #f0e2a8;
+    }
+    footer .credit-actions .btn-admin-link {
+      border-color: rgba(197, 204, 214, 0.28);
+      color: var(--steel, #8b95a5);
+    }
+    footer .credit-actions .btn-admin-link:hover {
+      color: var(--silver, #c5ccd6);
+      border-color: rgba(197, 204, 214, 0.45);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.62);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-sheet {
+      width: min(480px, 100%);
+      max-height: min(90vh, 640px);
+      overflow: auto;
+      background: var(--surface-solid);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      animation: riseIn 0.22s ease-out;
+    }
+    .modal-sheet h2 {
+      font-family: var(--display);
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+    .modal-sheet .modal-desc {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .modal-sheet textarea.inp {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    .modal-sheet select.inp {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 32px;
+    }
+    .modal-field { margin-bottom: 12px; }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .modal-actions .btn-p { flex: 1; min-width: 120px; margin-top: 0; }
+    .modal-actions .btn-s { padding: 14px 18px; }
+    #alertFeedback { margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -596,7 +695,40 @@
         · 2026 Produced by <strong>QinQin</strong>
         · version <strong id="appVersion">1.0.0</strong>
       </div>
+      <div class="credit-actions">
+        <button type="button" class="btn-feedback" id="btnOpenFeedback">Báo lỗi / Góp ý</button>
+        <a class="btn-feedback btn-admin-link" href="/admin">Admin</a>
+      </div>
     </footer>
+  </div>
+
+  <div class="modal-backdrop" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle" hidden>
+    <div class="modal-sheet">
+      <h2 id="feedbackTitle">Báo lỗi và góp ý phát triển</h2>
+      <p class="modal-desc">Phản hồi được lưu trên server để admin xem và xử lý.</p>
+      <form id="feedbackForm">
+        <div class="modal-field">
+          <label class="nlb" for="feedbackType">Loại</label>
+          <select class="inp" id="feedbackType" required>
+            <option value="bug" selected>Báo lỗi</option>
+            <option value="idea">Góp ý phát triển</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label class="nlb" for="feedbackMessage">Nội dung</label>
+          <textarea class="inp" id="feedbackMessage" required placeholder="Mô tả lỗi hoặc ý tưởng của bạn..."></textarea>
+        </div>
+        <div class="modal-field">
+          <label class="nlb" for="feedbackContact">Liên hệ (tuỳ chọn)</label>
+          <input class="inp" id="feedbackContact" type="text" placeholder="Email / Zalo / ...">
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn-p" id="btnSendFeedback">Gửi</button>
+          <button type="button" class="btn-s" id="btnCloseFeedback">Đóng</button>
+        </div>
+        <div id="alertFeedback" class="alert"></div>
+      </form>
+    </div>
   </div>
 
   <script src="node_modules/mammoth/mammoth.browser.min.js"></script>
@@ -1248,6 +1380,88 @@
 
     ['congOld', 'thuOld'].forEach((id) => {
       $(id).addEventListener('input', updateVersionButton);
+    });
+
+    const FEEDBACK_MAX_MESSAGE = 5000;
+
+    function openFeedbackModal() {
+      const modal = $('feedbackModal');
+      modal.hidden = false;
+      modal.classList.add('open');
+      hideAlert('alertFeedback');
+      $('btnSendFeedback').disabled = false;
+      $('btnSendFeedback').textContent = 'Gửi';
+      $('feedbackMessage').focus();
+    }
+
+    function closeFeedbackModal() {
+      const modal = $('feedbackModal');
+      modal.classList.remove('open');
+      modal.hidden = true;
+    }
+
+    $('btnOpenFeedback').addEventListener('click', openFeedbackModal);
+    $('btnCloseFeedback').addEventListener('click', closeFeedbackModal);
+    $('feedbackModal').addEventListener('click', (e) => {
+      if (e.target === $('feedbackModal')) closeFeedbackModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('feedbackModal').classList.contains('open')) {
+        closeFeedbackModal();
+      }
+    });
+    $('feedbackForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const typeValue = $('feedbackType').value;
+      const message = ($('feedbackMessage').value || '').trim();
+      const contact = ($('feedbackContact').value || '').trim();
+      if (!message) {
+        showAlert('alertFeedback', 'Vui lòng nhập nội dung.', 'error');
+        $('feedbackMessage').focus();
+        return;
+      }
+      if (message.length > FEEDBACK_MAX_MESSAGE) {
+        showAlert('alertFeedback', `Nội dung tối đa ${FEEDBACK_MAX_MESSAGE} ký tự.`, 'error');
+        return;
+      }
+
+      const btn = $('btnSendFeedback');
+      btn.disabled = true;
+      btn.textContent = 'Đang gửi…';
+      hideAlert('alertFeedback');
+
+      try {
+        await ensureServerUp();
+        const res = await fetch(`${API_BASE}/api/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: typeValue,
+            message,
+            contact,
+            version: ($('appVersion') && $('appVersion').textContent.trim()) || '1.0.0',
+            pageUrl: window.location.href,
+            userAgent: (navigator.userAgent || '').slice(0, 200),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || `Gửi thất bại (${res.status}).`);
+        }
+        showAlert('alertFeedback', 'Đã gửi phản hồi. Cảm ơn bạn!', 'success');
+        $('feedbackForm').reset();
+        $('feedbackType').value = 'bug';
+        setTimeout(closeFeedbackModal, 1200);
+      } catch (err) {
+        showAlert(
+          'alertFeedback',
+          formatFetchError(err, err.message || 'Không gửi được phản hồi.'),
+          'error'
+        );
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Gửi';
+      }
     });
 
     lockFixedNewNames();

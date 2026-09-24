@@ -43,6 +43,17 @@ Phù hợp app Node.js chạy liên tục, có scrape HTTP ra ngoài.
 - Sau ~15 phút không ai truy cập, server **ngủ** — lần mở đầu có thể chờ 30–60 giây
 - Tải truyện dài (50+ chương) mất vài phút — giữ tab mở, không refresh giữa chừng
 
+**Feedback log (admin):** form “Báo lỗi / Góp ý” lưu vào `data/feedback.json`. Xem tại `/admin` (cần đăng nhập).
+
+1. Đặt biến môi trường:
+   - `ADMIN_USER` (mặc định `admin`)
+   - `ADMIN_PASS` (bắt buộc)
+   - `ADMIN_SESSION_SECRET` (chuỗi ngẫu nhiên dài)
+2. Local: copy `.env.example` → `.env` và điền mật khẩu
+3. Render: Environment → điền `ADMIN_PASS` + `ADMIN_SESSION_SECRET`
+
+**Lưu ý Render free:** filesystem tạm — log có thể mất khi redeploy/sleep.
+
 **Tùy chọn:** Đổi region trong `render.yaml` (`singapore` / `oregon`).
 
 ---

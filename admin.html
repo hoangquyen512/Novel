@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin · Feedback — Download and Change</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #eef2f6;
+      --muted: #9aa3af;
+      --line: rgba(196, 203, 213, 0.18);
+      --surface: rgba(28, 30, 34, 0.86);
+      --surface-solid: #22252b;
+      --bg-1: #0c0d10;
+      --bg-2: #14161a;
+      --accent: #d4af37;
+      --accent-2: #e8d48b;
+      --accent-soft: rgba(212, 175, 55, 0.12);
+      --danger: #f87171;
+      --ok: #a3e635;
+      --warn: #fbbf24;
+      --radius: 16px;
+      --shadow: 0 22px 50px rgba(0, 0, 0, 0.42);
+      --font: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+      --display: 'Sora', 'Segoe UI', sans-serif;
+      --input-bg: #121417;
+    }
+    body {
+      font-family: var(--font);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 28px 16px 64px;
+      background:
+        radial-gradient(900px 420px at 10% -8%, rgba(212, 175, 55, 0.14), transparent 55%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      color-scheme: dark;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 {
+      font-family: var(--display);
+      font-size: 1.45rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+    label, .nlb {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .inp {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font: inherit;
+      font-size: 14px;
+    }
+    .inp:focus {
+      outline: none;
+      border-color: rgba(212, 175, 55, 0.55);
+    }
+    .btn-p, .btn-s {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-p {
+      background: linear-gradient(135deg, #c9a227, #e8d48b);
+      color: #1a1508;
+    }
+    .btn-p:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-s {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
+    .btn-s:hover { border-color: rgba(212, 175, 55, 0.45); color: var(--accent-2); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .alert { display: none; margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-size: 13px; }
+    .alert.error { display: block; background: rgba(251,113,133,.1); border: 1px solid rgba(251,113,133,.28); color: var(--danger); }
+    .alert.success { display: block; background: rgba(163,230,53,.08); border: 1px solid rgba(163,230,53,.28); color: var(--ok); }
+    .alert.info { display: block; background: rgba(197,204,214,.08); border: 1px solid var(--line); color: var(--muted); }
+    #loginView { max-width: 400px; margin: 48px auto 0; }
+    .field { margin-bottom: 12px; }
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .filters .span2 { grid-column: span 2; }
+    @media (max-width: 640px) {
+      .filters .span2 { grid-column: span 1; }
+    }
+    .meta { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+    .list { display: flex; flex-direction: column; gap: 12px; }
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: rgba(18, 20, 23, 0.55);
+    }
+    .item-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .chip.bug { color: #fda4af; border-color: rgba(251,113,133,.35); background: rgba(251,113,133,.08); }
+    .chip.idea { color: #c4b5fd; border-color: rgba(167,139,250,.35); background: rgba(167,139,250,.08); }
+    .chip.open { color: var(--warn); border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08); }
+    .chip.done { color: var(--ok); border-color: rgba(163,230,53,.35); background: rgba(163,230,53,.08); }
+    .when { font-size: 12px; color: var(--muted); margin-left: auto; }
+    .msg {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 14px;
+      line-height: 1.55;
+      margin-bottom: 8px;
+    }
+    .details { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .details a { color: var(--accent-2); }
+    .item-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .empty { text-align: center; color: var(--muted); padding: 28px 12px; font-size: 14px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="loginView">
+      <h1>Admin Feedback</h1>
+      <p class="sub">Đăng nhập để xem và xử lý báo lỗi / góp ý.</p>
+      <div class="card">
+        <form id="loginForm">
+          <div class="field">
+            <label for="username">Tài khoản</label>
+            <input class="inp" id="username" name="username" autocomplete="username" required>
+          </div>
+          <div class="field">
+            <label for="password">Mật khẩu</label>
+            <input class="inp" id="password" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="btn-row">
+            <button class="btn-p" type="submit" id="btnLogin">Đăng nhập</button>
+            <a class="btn-s" href="/" style="text-decoration:none;display:inline-flex;align-items:center;">Về trang chính</a>
+          </div>
+          <div id="alertLogin" class="alert"></div>
+        </form>
+      </div>
+    </div>
+
+    <div id="dashView" class="hidden">
+      <div class="topbar">
+        <div>
+          <h1>Log phản hồi</h1>
+          <p class="sub" id="whoLine">—</p>
+        </div>
+        <div class="btn-row" style="margin-top:0;">
+          <button type="button" class="btn-s" id="btnRefresh">Làm mới</button>
+          <button type="button" class="btn-s" id="btnLogout">Đăng xuất</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="filters">
+          <div>
+            <label class="nlb" for="filterStatus">Trạng thái</label>
+            <select class="inp" id="filterStatus">
+              <option value="">Tất cả</option>
+              <option value="open">Chưa xử lý</option>
+              <option value="done">Đã xử lý</option>
+            </select>
+          </div>
+          <div>
+            <label class="nlb" for="filterType">Loại</label>
+            <select class="inp" id="filterType">
+              <option value="">Tất cả</option>
+              <option value="bug">Báo lỗi</option>
+              <option value="idea">Góp ý</option>
+            </select>
+          </div>
+          <div>
+            <label class="nlb" for="filterFrom">Từ ngày</label>
+            <input class="inp" id="filterFrom" type="date">
+          </div>
+          <div>
+            <label class="nlb" for="filterTo">Đến ngày</label>
+            <input class="inp" id="filterTo" type="date">
+          </div>
+          <div class="span2">
+            <label class="nlb" for="filterQ">Tìm nội dung</label>
+            <input class="inp" id="filterQ" type="search" placeholder="Nội dung, liên hệ, URL…">
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:0;">
+          <button type="button" class="btn-p" id="btnApplyFilter">Lọc</button>
+          <button type="button" class="btn-s" id="btnClearFilter">Xóa lọc</button>
+        </div>
+        <div id="alertDash" class="alert"></div>
+        <p class="meta" id="resultMeta"></p>
+        <div class="list" id="feedbackList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const API = window.location.origin;
+
+    function showAlert(id, msg, type) {
+      const el = $(id);
+      el.textContent = msg;
+      el.className = `alert ${type}`;
+    }
+    function hideAlert(id) {
+      $(id).className = 'alert';
+      $(id).textContent = '';
+    }
+
+    function escapeHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatWhen(iso) {
+      if (!iso) return '—';
+      try {
+        return new Date(iso).toLocaleString('vi-VN');
+      } catch {
+        return iso;
+      }
+    }
+
+    function typeLabel(t) {
+      return t === 'idea' ? 'Góp ý' : 'Báo lỗi';
+    }
+
+    function statusLabel(s) {
+      return s === 'done' ? 'Đã xử lý' : 'Chưa xử lý';
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(`${API}${path}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        const err = new Error(data.error || `Lỗi ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+      return data;
+    }
+
+    function showLogin() {
+      $('loginView').classList.remove('hidden');
+      $('dashView').classList.add('hidden');
+    }
+
+    function showDash(user) {
+      $('loginView').classList.add('hidden');
+      $('dashView').classList.remove('hidden');
+      $('whoLine').textContent = `Đăng nhập: ${user}`;
+    }
+
+    async function checkSession() {
+      try {
+        const data = await api('/api/admin/me');
+        showDash(data.user);
+        await loadList();
+      } catch {
+        showLogin();
+      }
+    }
+
+    function filterQuery() {
+      const params = new URLSearchParams();
+      const status = $('filterStatus').value;
+      const type = $('filterType').value;
+      const from = $('filterFrom').value;
+      const to = $('filterTo').value;
+      const q = $('filterQ').value.trim();
+      if (status) params.set('status', status);
+      if (type) params.set('type', type);
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      if (q) params.set('q', q);
+      const qs = params.toString();
+      return qs ? `?${qs}` : '';
+    }
+
+    async function loadList() {
+      hideAlert('alertDash');
+      $('feedbackList').innerHTML = '<p class="empty">Đang tải…</p>';
+      try {
+        const data = await api(`/api/admin/feedback${filterQuery()}`);
+        const items = data.items || [];
+        $('resultMeta').textContent = `${items.length} bản ghi`;
+        if (!items.length) {
+          $('feedbackList').innerHTML = '<p class="empty">Không có log phù hợp bộ lọc.</p>';
+          return;
+        }
+        $('feedbackList').innerHTML = items.map((item) => {
+          const nextStatus = item.status === 'done' ? 'open' : 'done';
+          const nextLabel = item.status === 'done' ? 'Đánh dấu chưa xử lý' : 'Đánh dấu đã xử lý';
+          return `
+            <article class="item" data-id="${escapeHtml(item.id)}">
+              <div class="item-head">
+                <span class="chip ${item.type === 'idea' ? 'idea' : 'bug'}">${escapeHtml(typeLabel(item.type))}</span>
+                <span class="chip ${item.status === 'done' ? 'done' : 'open'}">${escapeHtml(statusLabel(item.status))}</span>
+                <span class="when">${escapeHtml(formatWhen(item.createdAt))}</span>
+              </div>
+              <div class="msg">${escapeHtml(item.message)}</div>
+              <div class="details">
+                ${item.contact ? `Liên hệ: ${escapeHtml(item.contact)}<br>` : ''}
+                Version: ${escapeHtml(item.version || '—')}
+                · IP: ${escapeHtml(item.ip || '—')}<br>
+                ${item.pageUrl ? `URL: <a href="${escapeHtml(item.pageUrl)}" target="_blank" rel="noopener">${escapeHtml(item.pageUrl)}</a><br>` : ''}
+                ${item.status === 'done' && item.resolvedAt ? `Xử lý lúc: ${escapeHtml(formatWhen(item.resolvedAt))}` : ''}
+              </div>
+              <div class="item-actions">
+                <button type="button" class="btn-s btn-status" data-status="${nextStatus}">${nextLabel}</button>
+              </div>
+            </article>`;
+        }).join('');
+      } catch (err) {
+        if (err.status === 401) {
+          showLogin();
+          return;
+        }
+        showAlert('alertDash', err.message || 'Không tải được log.', 'error');
+        $('feedbackList').innerHTML = '';
+        $('resultMeta').textContent = '';
+      }
+    }
+
+    $('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideAlert('alertLogin');
+      const btn = $('btnLogin');
+      btn.disabled = true;
+      try {
+        const data = await api('/api/admin/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            username: $('username').value.trim(),
+            password: $('password').value,
+          }),
+        });
+        $('password').value = '';
+        showDash(data.user);
+        await loadList();
+      } catch (err) {
+        showAlert('alertLogin', err.message || 'Đăng nhập thất bại.', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('btnLogout').addEventListener('click', async () => {
+      try { await api('/api/admin/logout', { method: 'POST', body: '{}' }); } catch (_) {}
+      showLogin();
+    });
+    $('btnRefresh').addEventListener('click', () => loadList());
+    $('btnApplyFilter').addEventListener('click', () => loadList());
+    $('btnClearFilter').addEventListener('click', () => {
+      $('filterStatus').value = '';
+      $('filterType').value = '';
+      $('filterFrom').value = '';
+      $('filterTo').value = '';
+      $('filterQ').value = '';
+      loadList();
+    });
+    $('feedbackList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.btn-status');
+      if (!btn) return;
+      const item = btn.closest('.item');
+      if (!item) return;
+      btn.disabled = true;
+      try {
+        await api(`/api/admin/feedback/${item.dataset.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: btn.dataset.status }),
+        });
+        await loadList();
+      } catch (err) {
+        showAlert('alertDash', err.message || 'Cập nhật thất bại.', 'error');
+        btn.disabled = false;
+      }
+    });
+
+    checkSession();
+  </script>
+</body>
+</html>
