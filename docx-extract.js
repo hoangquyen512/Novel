@@ -1,34 +1,6 @@
 const fs = require('fs');
 const yauzl = require('yauzl');
-
-function decodeXmlEntities(text) {
-  return String(text || '')
-    .replace(/&#(\d+);/g, (_, n) => {
-      const code = Number(n);
-      return Number.isFinite(code) ? String.fromCharCode(code) : _;
-    })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
-      const code = parseInt(h, 16);
-      return Number.isFinite(code) ? String.fromCharCode(code) : _;
-    })
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
-}
-
-function xmlToRawText(xml) {
-  return decodeXmlEntities(
-    String(xml || '')
-      .replace(/<w:tab\b[^>]*\/>/gi, '\t')
-      .replace(/<w:br\b[^>]*\/>/gi, '\n')
-      .replace(/<\/w:p>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/\u00a0/g, ' ')
-      .replace(/\r/g, '')
-  );
-}
+const { xmlToRawText, textToParagraphs } = require('./docx-xml');
 
 function readStreamToString(stream) {
   return new Promise((resolve, reject) => {
@@ -70,13 +42,6 @@ async function extractRawTextFromDocx({ filePath, buffer } = {}) {
   }
 
   throw new Error('File .docx không hợp lệ (thiếu word/document.xml).');
-}
-
-function textToParagraphs(text) {
-  return String(text || '')
-    .split(/\n+/)
-    .map((s) => s.replace(/[ \t]+/g, ' ').trim())
-    .filter(Boolean);
 }
 
 function safeUnlink(filePath) {

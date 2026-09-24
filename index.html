@@ -615,7 +615,7 @@
           <label for="docxFile">File (.docx / .pdf)</label>
           <input type="file" id="docxFile" class="file-pick" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf">
           <div class="hint">
-            Một file cả bộ (.docx hoặc .pdf). Word parse trên server (tránh Out of Memory); PDF convert trên trình duyệt.
+            Một file cả bộ (.docx hoặc .pdf). Word đọc trực tiếp trên trình duyệt (chỉ lấy chữ, bỏ ảnh — không gửi server, tránh 502/OOM).
             Tiêu đề chương dạng <em>Chương 1</em> / <em>Chuong 1</em> / <em>Chapter 1</em>.
           </div>
           <div class="btn-row">
@@ -731,7 +731,8 @@
     </div>
   </div>
 
-  <script src="node_modules/mammoth/mammoth.browser.min.js"></script>
+  <script src="docx-xml.js"></script>
+  <script src="docx-client.js"></script>
   <script src="docx-story.js"></script>
   <script src="change-version.js"></script>
   <script>
@@ -1197,61 +1198,21 @@
 
     async function convertDocxToStory(file, fallbackTitle) {
       const sizeMb = file.size / (1024 * 1024);
-      await ensureServerUp();
+      if (!window.DocxClient || typeof DocxClient.storyFromDocxFile !== 'function') {
+        throw new Error('Thiếu module đọc Word trên trình duyệt. Tải lại trang.');
+      }
       await paintProgress(
-        25,
+        30,
         100,
-        `Đang gửi Word lên server (${sizeMb.toFixed(1)} MB)…`
+        `Đang đọc Word trên máy bạn (${sizeMb.toFixed(1)} MB, bỏ ảnh)…`
       );
-
-      const form = new FormData();
-      form.append('file', file, file.name);
-
-      let res;
-      try {
-        res = await withTimeout(
-          fetch(`${API_BASE}/api/parse-docx`, { method: 'POST', body: form }),
-          300000,
-          'Đọc file Word trên server'
-        );
-      } catch (err) {
-        throw new Error(
-          err.message ||
-            'Không kết nối được server khi đọc Word. Thử lại hoặc chia nhỏ file.'
-        );
-      }
-
-      await paintProgress(70, 100, 'Đang nhận kết quả từ server…');
-      const rawBody = await res.text();
-      let data = {};
-      try {
-        data = JSON.parse(rawBody);
-      } catch (_) {
-        data = {};
-      }
-
-      if (res.status === 502 || res.status === 504) {
-        throw new Error(
-          'Server quá tải hoặc hết bộ nhớ khi đọc file (502). Hãy thử file nhỏ hơn, hoặc mở lại trang sau 1 phút.'
-        );
-      }
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || `Không đọc được file Word (${res.status}).`);
-      }
-
-      const text = String(data.text || '');
-      if (!text.trim()) {
-        throw new Error('Server không trả về nội dung chữ.');
-      }
-
-      await paintProgress(85, 100, 'Đang tách chương trên máy bạn…');
-      const paragraphs = text
-        .split(/\n+/)
-        .map((s) => s.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-      const story = DocxStory.splitChaptersFromParagraphs(paragraphs, {
-        fallbackTitle: data.title || fallbackTitle,
-      });
+      // Client-only: zip.js BlobReader streams just word/document.xml — no Render RAM/timeout
+      const story = await withTimeout(
+        DocxClient.storyFromDocxFile(file, { fallbackTitle }),
+        300000,
+        'Đọc file Word'
+      );
+      await paintProgress(85, 100, 'Đã tách chương…');
       return story;
     }
 
@@ -1279,8 +1240,8 @@
       await paintProgress(10, 100, isPdf ? 'Đang đọc PDF...' : 'Đang đọc file .docx...');
 
       try {
-        if (file.size > 60 * 1024 * 1024) {
-          throw new Error('File quá lớn (>60MB). Hãy chia nhỏ hoặc xuất PDF/text trước.');
+        if (file.size > 120 * 1024 * 1024) {
+          throw new Error('File quá lớn (>120MB). Hãy chia nhỏ file trước khi đọc.');
         }
         const fallbackTitle = DocxStory.storyTitleFromFilename(file.name);
         let story;
@@ -1298,7 +1259,7 @@
           story = DocxStory.storyFromPdfHtml(html, { fallbackTitle });
           appState.sourceHtml = html;
         } else {
-          // Word: parse trên server để tránh Out of Memory trên trình duyệt
+          // Word: đọc trên trình duyệt (chỉ document.xml) — không phụ thuộc Render
           story = await convertDocxToStory(file, fallbackTitle);
           appState.sourceHtml = null;
         }

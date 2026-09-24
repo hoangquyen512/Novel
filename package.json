@@ -16,6 +16,7 @@
     "test": "node --test wordpress.test.js docx-story.test.js pdf-sample.test.js dammy.test.js docx-extract.test.js"
   },
   "dependencies": {
+    "@zip.js/zip.js": "^2.7.57",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",

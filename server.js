@@ -1274,7 +1274,7 @@ app.get('/api/health', (_req, res) => {
     service: 'novel-downloader',
     env: process.env.NODE_ENV || 'development',
     adminConfigured: Boolean(ADMIN_PASS),
-    commitHint: 'docx-disk-stream-v2',
+    commitHint: 'docx-client-zipjs-v3',
   });
 });
 
