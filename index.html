@@ -615,7 +615,7 @@
           <label for="docxFile">File (.docx / .pdf)</label>
           <input type="file" id="docxFile" class="file-pick" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf">
           <div class="hint">
-            Một file cả bộ (.docx hoặc .pdf). Word đọc trực tiếp trên trình duyệt (chỉ lấy chữ, bỏ ảnh — không gửi server, tránh 502/OOM).
+            Một file cả bộ (.docx hoặc .pdf). Word chỉ giải nén phần chữ bằng bộ nén sẵn của trình duyệt (bỏ ảnh, không gửi server).
             Tiêu đề chương dạng <em>Chương 1</em> / <em>Chuong 1</em> / <em>Chapter 1</em>.
           </div>
           <div class="btn-row">
@@ -731,9 +731,8 @@
     </div>
   </div>
 
-  <script src="docx-xml.js"></script>
-  <script src="docx-client.js"></script>
   <script src="docx-story.js"></script>
+  <script src="docx-fast.js"></script>
   <script src="change-version.js"></script>
   <script>
     const API_BASE = (() => {
@@ -1198,21 +1197,16 @@
 
     async function convertDocxToStory(file, fallbackTitle) {
       const sizeMb = file.size / (1024 * 1024);
-      if (!window.DocxClient || typeof DocxClient.storyFromDocxFile !== 'function') {
-        throw new Error('Thiếu module đọc Word trên trình duyệt. Tải lại trang.');
+      if (!window.DocxFast || typeof DocxFast.storyFromDocxFile !== 'function') {
+        throw new Error('Thiếu module đọc Word. Tải lại trang (Ctrl+F5).');
       }
-      await paintProgress(
-        30,
-        100,
-        `Đang đọc Word trên máy bạn (${sizeMb.toFixed(1)} MB, bỏ ảnh)…`
-      );
-      // Client-only: zip.js BlobReader streams just word/document.xml — no Render RAM/timeout
-      const story = await withTimeout(
-        DocxClient.storyFromDocxFile(file, { fallbackTitle }),
-        300000,
-        'Đọc file Word'
-      );
-      await paintProgress(85, 100, 'Đã tách chương…');
+      await paintProgress(12, 100, `Đang đọc Word (${sizeMb.toFixed(1)} MB)…`);
+      // Native inflate of document.xml only — no 300s cap, no server, images skipped
+      const story = await DocxFast.storyFromDocxFile(file, {
+        fallbackTitle,
+        onProgress: (pct, label) => updateProgress(pct, 100, label),
+      });
+      await paintProgress(95, 100, `Đã tách ${story.chapters.length} chương`);
       return story;
     }
 
