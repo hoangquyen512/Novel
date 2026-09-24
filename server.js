@@ -53,10 +53,11 @@ app.use(express.static(path.join(__dirname)));
 const FEEDBACK_MAX_MESSAGE = 5000;
 const feedbackRateMap = new Map();
 const ADMIN_USER = (process.env.ADMIN_USER || 'admin').trim();
-const ADMIN_PASS = (process.env.ADMIN_PASS || '').trim();
+// Default used when env unset (local/.env or Render Environment can override).
+const ADMIN_PASS = (process.env.ADMIN_PASS || 'Qin@123456789').trim();
 const ADMIN_SESSION_SECRET = (
   process.env.ADMIN_SESSION_SECRET ||
-  crypto.randomBytes(24).toString('hex')
+  '4b03cea8cc04bb53352b173e683c17eb9d6aef88b8114796'
 ).trim();
 const ADMIN_COOKIE = 'dac_admin';
 const ADMIN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;

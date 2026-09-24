@@ -14,6 +14,6 @@ services:
       - key: ADMIN_USER
         value: admin
       - key: ADMIN_PASS
-        sync: false
+        value: Qin@123456789
       - key: ADMIN_SESSION_SECRET
-        sync: false
+        value: 4b03cea8cc04bb53352b173e683c17eb9d6aef88b8114796
