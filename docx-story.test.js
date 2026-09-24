@@ -18,12 +18,14 @@ describe('docx-story fixed names', () => {
 });
 
 describe('isChapterHeading / parseChapterHeading', () => {
-  it('matches Chương N and Chương N: title', () => {
+  it('matches Chương N, Chuong N, and Chapter N', () => {
     assert.equal(isChapterHeading('Chương 1'), true);
     assert.equal(isChapterHeading('Chương 12: Gặp lại'), true);
     assert.equal(isChapterHeading('  chương 3 — khởi đầu  '), true);
+    assert.equal(isChapterHeading('Chuong 1'), true);
+    assert.equal(isChapterHeading('Chapter 2: Hello'), true);
+    assert.equal(isChapterHeading('Ch. 3'), true);
     assert.equal(isChapterHeading('Đây không phải chương'), false);
-    assert.equal(isChapterHeading('Chapter 1'), false);
   });
 
   it('parses number and optional title', () => {

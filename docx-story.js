@@ -9,7 +9,7 @@
   const FIXED_THU_NEW = 'Tiêu Chiến';
 
   const CHAPTER_HEADING_RE =
-    /^\s*Chương\s+(\d+)\s*(?:[:：.\-–—]\s*(.*?))?\s*$/i;
+    /^\s*(?:Chương|Chuong|Chapter|Ch\.?)\s+(\d+)\s*(?:[:：.\-–—]\s*(.*?))?\s*$/i;
 
   function escapeHtml(text) {
     return String(text || '')
@@ -208,8 +208,15 @@
     }
 
     if (!chapters.length) {
+      const preview = paragraphs
+        .slice(0, 6)
+        .map((p) => String(p || '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .map((p) => (p.length > 60 ? `${p.slice(0, 57)}...` : p))
+        .join(' | ');
       throw new Error(
-        'Không tìm thấy tiêu đề chương dạng "Chương 1", "Chương 2: ..." trong file.'
+        'Không tìm thấy tiêu đề chương dạng "Chương 1", "Chuong 1" hoặc "Chapter 1" trong file.' +
+          (preview ? ` Các dòng đầu: ${preview}` : '')
       );
     }
 
