@@ -4,6 +4,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 const multer = require('multer');
 const { URL } = require('url');
@@ -14,7 +15,11 @@ const {
 } = require('./wordpress');
 const { extractDammyChapterContent: extractDammyChapterContentCore } = require('./dammy');
 const feedbackStore = require('./feedback-store');
-const { extractRawTextFromDocx, textToParagraphs } = require('./docx-extract');
+const {
+  extractRawTextFromDocx,
+  textToParagraphs,
+  safeUnlink,
+} = require('./docx-extract');
 const DocxStory = require('./docx-story');
 
 // Load .env (local) without extra dependency
@@ -55,7 +60,15 @@ app.use(express.static(path.join(__dirname)));
 
 const DOCX_MAX_BYTES = 60 * 1024 * 1024;
 const docxUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const safe = String(file.originalname || 'upload.docx')
+        .replace(/[^\w.\-()+ ]+/g, '_')
+        .slice(0, 80);
+      cb(null, `dac-${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${safe}`);
+    },
+  }),
   limits: { fileSize: DOCX_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     const name = String(file.originalname || '').toLowerCase();
@@ -1261,13 +1274,15 @@ app.get('/api/health', (_req, res) => {
     service: 'novel-downloader',
     env: process.env.NODE_ENV || 'development',
     adminConfigured: Boolean(ADMIN_PASS),
-    commitHint: 'docx-server-parse-v1',
+    commitHint: 'docx-disk-stream-v2',
   });
 });
 
 app.post('/api/parse-docx', (req, res) => {
   docxUpload.single('file')(req, res, async (err) => {
+    const tmpPath = req.file && req.file.path;
     if (err) {
+      safeUnlink(tmpPath);
       const msg =
         err.code === 'LIMIT_FILE_SIZE'
           ? `File quá lớn (tối đa ${Math.round(DOCX_MAX_BYTES / (1024 * 1024))}MB).`
@@ -1275,28 +1290,36 @@ app.post('/api/parse-docx', (req, res) => {
       return res.status(400).json({ ok: false, error: msg });
     }
     try {
-      if (!req.file || !req.file.buffer) {
+      if (!tmpPath) {
         return res.status(400).json({ ok: false, error: 'Thiếu file .docx.' });
       }
-      const fallbackTitle = DocxStory.storyTitleFromFilename(req.file.originalname);
-      const text = await extractRawTextFromDocx(req.file.buffer);
-      // Release upload buffer reference ASAP
-      req.file.buffer = null;
+      const fallbackTitle = DocxStory.storyTitleFromFilename(
+        req.file.originalname || 'truyen.docx'
+      );
+      // Stream only document.xml from disk — never load images into RAM
+      const text = await extractRawTextFromDocx({ filePath: tmpPath });
+      safeUnlink(tmpPath);
+
       if (!String(text || '').trim()) {
         return res.status(400).json({
           ok: false,
           error: 'File Word không có nội dung chữ (có thể chỉ có ảnh hoặc file hỏng).',
         });
       }
+
+      // Return plain text only (client splits chapters) — smaller JSON, less RAM
       const paragraphs = textToParagraphs(text);
-      const story = DocxStory.splitChaptersFromParagraphs(paragraphs, { fallbackTitle });
+      const previewTitle =
+        paragraphs[0] && paragraphs[0].length <= 120 ? paragraphs[0] : fallbackTitle;
+
       return res.json({
         ok: true,
-        title: story.title,
-        chapters: story.chapters,
+        title: previewTitle || fallbackTitle,
+        text,
         paragraphCount: paragraphs.length,
       });
     } catch (error) {
+      safeUnlink(tmpPath);
       console.error('parse-docx failed:', error.message || error);
       return res.status(500).json({
         ok: false,

@@ -1207,24 +1207,52 @@
       const form = new FormData();
       form.append('file', file, file.name);
 
-      const res = await withTimeout(
-        fetch(`${API_BASE}/api/parse-docx`, { method: 'POST', body: form }),
-        300000,
-        'Đọc file Word trên server'
-      );
+      let res;
+      try {
+        res = await withTimeout(
+          fetch(`${API_BASE}/api/parse-docx`, { method: 'POST', body: form }),
+          300000,
+          'Đọc file Word trên server'
+        );
+      } catch (err) {
+        throw new Error(
+          err.message ||
+            'Không kết nối được server khi đọc Word. Thử lại hoặc chia nhỏ file.'
+        );
+      }
+
       await paintProgress(70, 100, 'Đang nhận kết quả từ server…');
-      const data = await res.json().catch(() => ({}));
+      const rawBody = await res.text();
+      let data = {};
+      try {
+        data = JSON.parse(rawBody);
+      } catch (_) {
+        data = {};
+      }
+
+      if (res.status === 502 || res.status === 504) {
+        throw new Error(
+          'Server quá tải hoặc hết bộ nhớ khi đọc file (502). Hãy thử file nhỏ hơn, hoặc mở lại trang sau 1 phút.'
+        );
+      }
       if (!res.ok || !data.ok) {
         throw new Error(data.error || `Không đọc được file Word (${res.status}).`);
       }
-      if (!data.chapters || !data.chapters.length) {
-        throw new Error('Server không trả về chương nào.');
+
+      const text = String(data.text || '');
+      if (!text.trim()) {
+        throw new Error('Server không trả về nội dung chữ.');
       }
-      await paintProgress(85, 100, 'Đang tách chương...');
-      return {
-        title: data.title || fallbackTitle,
-        chapters: data.chapters,
-      };
+
+      await paintProgress(85, 100, 'Đang tách chương trên máy bạn…');
+      const paragraphs = text
+        .split(/\n+/)
+        .map((s) => s.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+      const story = DocxStory.splitChaptersFromParagraphs(paragraphs, {
+        fallbackTitle: data.title || fallbackTitle,
+      });
+      return story;
     }
 
     async function startParseUploadFile() {

@@ -1,9 +1,16 @@
-const JSZip = require('jszip');
+const fs = require('fs');
+const yauzl = require('yauzl');
 
 function decodeXmlEntities(text) {
   return String(text || '')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => {
+      const code = Number(n);
+      return Number.isFinite(code) ? String.fromCharCode(code) : _;
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      const code = parseInt(h, 16);
+      return Number.isFinite(code) ? String.fromCharCode(code) : _;
+    })
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -11,24 +18,9 @@ function decodeXmlEntities(text) {
     .replace(/&apos;/g, "'");
 }
 
-/**
- * Low-memory .docx text extract: only decompress word/document.xml (skip images).
- */
-async function extractRawTextFromDocx(buffer) {
-  const zip = await JSZip.loadAsync(buffer, { createFolders: false });
-  const docFile = zip.file('word/document.xml');
-  if (!docFile) {
-    throw new Error('File .docx không hợp lệ (thiếu word/document.xml).');
-  }
-
-  const xml = await docFile.async('string');
-  // Drop other zip entries ASAP to help GC
-  Object.keys(zip.files).forEach((name) => {
-    if (name !== 'word/document.xml') delete zip.files[name];
-  });
-
-  const text = decodeXmlEntities(
-    xml
+function xmlToRawText(xml) {
+  return decodeXmlEntities(
+    String(xml || '')
       .replace(/<w:tab\b[^>]*\/>/gi, '\t')
       .replace(/<w:br\b[^>]*\/>/gi, '\n')
       .replace(/<\/w:p>/gi, '\n')
@@ -36,8 +28,48 @@ async function extractRawTextFromDocx(buffer) {
       .replace(/\u00a0/g, ' ')
       .replace(/\r/g, '')
   );
+}
 
-  return text;
+function readStreamToString(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+  });
+}
+
+/**
+ * Stream-only extract of word/document.xml (never decompress images/media).
+ * Prefer filePath (disk) over buffer to keep peak RAM lower on Render.
+ */
+async function extractRawTextFromDocx({ filePath, buffer } = {}) {
+  let zipfile;
+  if (filePath) {
+    zipfile = await yauzl.openPromise(filePath, { lazyEntries: true, autoClose: false });
+  } else if (buffer) {
+    zipfile = await yauzl.fromBufferPromise(buffer, { lazyEntries: true });
+  } else {
+    throw new Error('Thiếu dữ liệu file .docx.');
+  }
+
+  try {
+    for await (const entry of zipfile.eachEntry()) {
+      const name = String(entry.fileName || '').replace(/\\/g, '/');
+      if (name !== 'word/document.xml') continue;
+      const readStream = await zipfile.openReadStreamPromise(entry);
+      const xml = await readStreamToString(readStream);
+      return xmlToRawText(xml);
+    }
+  } finally {
+    try {
+      zipfile.close();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  throw new Error('File .docx không hợp lệ (thiếu word/document.xml).');
 }
 
 function textToParagraphs(text) {
@@ -47,7 +79,18 @@ function textToParagraphs(text) {
     .filter(Boolean);
 }
 
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  try {
+    fs.unlinkSync(filePath);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 module.exports = {
   extractRawTextFromDocx,
   textToParagraphs,
+  xmlToRawText,
+  safeUnlink,
 };
