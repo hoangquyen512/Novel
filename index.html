@@ -615,8 +615,8 @@
           <label for="docxFile">File (.docx / .pdf)</label>
           <input type="file" id="docxFile" class="file-pick" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf">
           <div class="hint">
-            Một file cả bộ (.docx hoặc .pdf). PDF sẽ được convert sang HTML trước khi đổi tên.
-            Tiêu đề chương dạng <em>Chương 1</em> / <em>CHƯƠNG 1</em>.
+            Một file cả bộ (.docx hoặc .pdf). Word parse trên server (tránh Out of Memory); PDF convert trên trình duyệt.
+            Tiêu đề chương dạng <em>Chương 1</em> / <em>Chuong 1</em> / <em>Chapter 1</em>.
           </div>
           <div class="btn-row">
             <button class="btn-p" id="btnParseDocx">Read file &amp; continue</button>
@@ -1195,41 +1195,36 @@
       await new Promise((r) => setTimeout(r, 40));
     }
 
-    async function convertDocxToStory(arrayBuffer, fallbackTitle) {
-      const sizeMb = arrayBuffer.byteLength / (1024 * 1024);
+    async function convertDocxToStory(file, fallbackTitle) {
+      const sizeMb = file.size / (1024 * 1024);
+      await ensureServerUp();
       await paintProgress(
-        45,
+        25,
         100,
-        `Đang đọc Word (${sizeMb.toFixed(1)} MB)…`
+        `Đang gửi Word lên server (${sizeMb.toFixed(1)} MB)…`
       );
 
-      // extractRawText bỏ ảnh/style → nhanh, ít treo hơn convertToHtml trên file dài
-      if (typeof mammoth.extractRawText !== 'function') {
-        throw new Error('Thư viện mammoth thiếu extractRawText. Tải lại trang.');
-      }
+      const form = new FormData();
+      form.append('file', file, file.name);
 
-      const raw = await withTimeout(
-        mammoth.extractRawText({ arrayBuffer }),
-        180000,
-        'Đọc file Word'
+      const res = await withTimeout(
+        fetch(`${API_BASE}/api/parse-docx`, { method: 'POST', body: form }),
+        300000,
+        'Đọc file Word trên server'
       );
-      const text = String(raw && raw.value != null ? raw.value : '');
-      if (!text.trim()) {
-        throw new Error('File Word không có nội dung chữ (có thể chỉ có ảnh hoặc file hỏng).');
+      await paintProgress(70, 100, 'Đang nhận kết quả từ server…');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Không đọc được file Word (${res.status}).`);
       }
-
-      await paintProgress(75, 100, 'Đang tách chương...');
-      const paragraphs = text
-        .split(/\n+/)
-        .map((s) => s.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
-
-      if (typeof DocxStory.splitChaptersFromParagraphs === 'function') {
-        return DocxStory.splitChaptersFromParagraphs(paragraphs, { fallbackTitle });
+      if (!data.chapters || !data.chapters.length) {
+        throw new Error('Server không trả về chương nào.');
       }
-      // fallback cũ
-      const html = paragraphs.map((p) => `<p>${DocxStory.escapeHtml(p)}</p>`).join('');
-      return DocxStory.storyFromDocxHtml(html, { fallbackTitle });
+      await paintProgress(85, 100, 'Đang tách chương...');
+      return {
+        title: data.title || fallbackTitle,
+        chapters: data.chapters,
+      };
     }
 
     async function startParseUploadFile() {
@@ -1249,10 +1244,6 @@
         showAlert('alertDownload', 'Thiếu module đọc file. Tải lại trang.', 'error');
         return;
       }
-      if (isDocx && typeof mammoth === 'undefined') {
-        showAlert('alertDownload', 'Thiếu thư viện đọc .docx. Chạy npm install rồi tải lại trang.', 'error');
-        return;
-      }
 
       hideAlert('alertDownload');
       $('btnParseDocx').disabled = true;
@@ -1260,13 +1251,14 @@
       await paintProgress(10, 100, isPdf ? 'Đang đọc PDF...' : 'Đang đọc file .docx...');
 
       try {
-        if (file.size > 80 * 1024 * 1024) {
-          throw new Error('File quá lớn (>80MB). Hãy chia nhỏ hoặc xuất PDF/text trước.');
+        if (file.size > 60 * 1024 * 1024) {
+          throw new Error('File quá lớn (>60MB). Hãy chia nhỏ hoặc xuất PDF/text trước.');
         }
-        const arrayBuffer = await file.arrayBuffer();
         const fallbackTitle = DocxStory.storyTitleFromFilename(file.name);
         let story;
         if (isPdf) {
+          // PDF vẫn parse trên trình duyệt (nhẹ hơn Word+mammoth)
+          const arrayBuffer = await file.arrayBuffer();
           await paintProgress(15, 100, 'Đang convert PDF → HTML...');
           const items = await withTimeout(
             extractPdfTextItems(arrayBuffer),
@@ -1276,10 +1268,10 @@
           await paintProgress(80, 100, 'Đang tách chương từ HTML...');
           const html = DocxStory.pdfItemsToHtml(items);
           story = DocxStory.storyFromPdfHtml(html, { fallbackTitle });
-          // Keep converted HTML draft available via normal draft download
           appState.sourceHtml = html;
         } else {
-          story = await convertDocxToStory(arrayBuffer, fallbackTitle);
+          // Word: parse trên server để tránh Out of Memory trên trình duyệt
+          story = await convertDocxToStory(file, fallbackTitle);
           appState.sourceHtml = null;
         }
         appState.downloaded = story;

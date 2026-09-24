@@ -5,6 +5,7 @@ const cheerio = require('cheerio');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const multer = require('multer');
 const { URL } = require('url');
 const {
   isWordpressHost,
@@ -13,6 +14,8 @@ const {
 } = require('./wordpress');
 const { extractDammyChapterContent: extractDammyChapterContentCore } = require('./dammy');
 const feedbackStore = require('./feedback-store');
+const { extractRawTextFromDocx, textToParagraphs } = require('./docx-extract');
+const DocxStory = require('./docx-story');
 
 // Load .env (local) without extra dependency
 (function loadDotEnv() {
@@ -49,6 +52,24 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '32kb' }));
 express.static.mime.define({ 'application/javascript': ['mjs'] });
 app.use(express.static(path.join(__dirname)));
+
+const DOCX_MAX_BYTES = 60 * 1024 * 1024;
+const docxUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: DOCX_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const name = String(file.originalname || '').toLowerCase();
+    const ok =
+      name.endsWith('.docx') ||
+      file.mimetype ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file.mimetype === 'application/octet-stream';
+    if (!ok) {
+      return cb(new Error('Chỉ nhận file .docx'));
+    }
+    return cb(null, true);
+  },
+});
 
 const FEEDBACK_MAX_MESSAGE = 5000;
 const feedbackRateMap = new Map();
@@ -1240,7 +1261,48 @@ app.get('/api/health', (_req, res) => {
     service: 'novel-downloader',
     env: process.env.NODE_ENV || 'development',
     adminConfigured: Boolean(ADMIN_PASS),
-    commitHint: 'admin-pass-default-v1',
+    commitHint: 'docx-server-parse-v1',
+  });
+});
+
+app.post('/api/parse-docx', (req, res) => {
+  docxUpload.single('file')(req, res, async (err) => {
+    if (err) {
+      const msg =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? `File quá lớn (tối đa ${Math.round(DOCX_MAX_BYTES / (1024 * 1024))}MB).`
+          : err.message || 'Upload thất bại.';
+      return res.status(400).json({ ok: false, error: msg });
+    }
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ ok: false, error: 'Thiếu file .docx.' });
+      }
+      const fallbackTitle = DocxStory.storyTitleFromFilename(req.file.originalname);
+      const text = await extractRawTextFromDocx(req.file.buffer);
+      // Release upload buffer reference ASAP
+      req.file.buffer = null;
+      if (!String(text || '').trim()) {
+        return res.status(400).json({
+          ok: false,
+          error: 'File Word không có nội dung chữ (có thể chỉ có ảnh hoặc file hỏng).',
+        });
+      }
+      const paragraphs = textToParagraphs(text);
+      const story = DocxStory.splitChaptersFromParagraphs(paragraphs, { fallbackTitle });
+      return res.json({
+        ok: true,
+        title: story.title,
+        chapters: story.chapters,
+        paragraphCount: paragraphs.length,
+      });
+    } catch (error) {
+      console.error('parse-docx failed:', error.message || error);
+      return res.status(500).json({
+        ok: false,
+        error: error.message || 'Không đọc được file Word trên server.',
+      });
+    }
   });
 });
 

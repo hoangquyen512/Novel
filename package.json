@@ -13,14 +13,16 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node --test wordpress.test.js docx-story.test.js pdf-sample.test.js dammy.test.js"
+    "test": "node --test wordpress.test.js docx-story.test.js pdf-sample.test.js dammy.test.js docx-extract.test.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "jszip": "^3.10.2",
     "mammoth": "^1.8.0",
+    "multer": "^2.4.0",
     "pdfjs-dist": "^4.10.38"
   }
 }
