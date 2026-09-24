@@ -9,6 +9,7 @@ const {
   fetchWordpressStoryInfo,
   fetchWordpressChapter,
 } = require('./wordpress');
+const { extractDammyChapterContent: extractDammyChapterContentCore } = require('./dammy');
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -506,8 +507,13 @@ function textBlocksFromElement($, el) {
 }
 
 function stripHiddenElements($, contentEl) {
-  contentEl.find('[hidden], [aria-hidden="true"]').remove();
+  contentEl.find('[hidden], [aria-hidden="true"]').each((_, el) => {
+    // Keep dammy unlocked body even if site left aria-hidden
+    if ($(el).hasClass('actac') || $(el).closest('.actac').length) return;
+    $(el).remove();
+  });
   contentEl.find('[style]').each((_, el) => {
+    if ($(el).hasClass('actac') || $(el).closest('.actac').length) return;
     const style = String($(el).attr('style') || '')
       .toLowerCase()
       .replace(/\s+/g, '');
@@ -530,6 +536,7 @@ function stripNonTextNoise($, contentEl) {
       'nav', 'aside', 'header', 'footer',
       '[id^="ads-"]', '.ads-content', '.adsbygoogle', '.ads-chapter-box',
       '.incontent-ad', '.ads-responsive', '.advertisement', '.quang-cao',
+      '.actcl',
     ].join(', ')
   ).remove();
 
@@ -619,23 +626,16 @@ function extractTruyenfullChapterContent($) {
 }
 
 function extractDammyChapterContent($) {
-  const contentMap = buildCssContentMap($);
-  const contentEl = $('#chapter-content-render, .chapter-content').first().clone();
-  if (!contentEl.length) {
-    throw new Error('Không tìm thấy nội dung chương (.chapter-content)');
-  }
-
-  restoreCssPseudoContent($, contentEl, contentMap);
-  stripHiddenElements($, contentEl);
-  stripNonTextNoise($, contentEl);
-
-  const paragraphs = extractParagraphsFromContent($, contentEl);
-  if (paragraphs.length) {
-    return paragraphs.join('\n');
-  }
-
-  const rawText = cleanPromoParagraph(normalizeStoryText(contentEl.text()));
-  return rawText ? `<p>${escapeHtml(rawText)}</p>` : '';
+  return extractDammyChapterContentCore($, {
+    buildCssContentMap,
+    restoreCssPseudoContent,
+    stripHiddenElements,
+    stripNonTextNoise,
+    extractParagraphsFromContent,
+    cleanPromoParagraph,
+    normalizeStoryText,
+    escapeHtml,
+  });
 }
 
 function extractChapterContent($, site) {
