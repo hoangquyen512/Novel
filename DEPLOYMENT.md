@@ -46,11 +46,11 @@ Phù hợp app Node.js chạy liên tục, có scrape HTTP ra ngoài.
 **Feedback log (admin):** form “Báo lỗi / Góp ý” lưu vào `data/feedback.json`. Xem tại `/admin` (cần đăng nhập).
 
 1. Đặt biến môi trường:
-   - `ADMIN_USER` (mặc định `admin`)
-   - `ADMIN_PASS` (bắt buộc)
-   - `ADMIN_SESSION_SECRET` (chuỗi ngẫu nhiên dài)
+   - `ADMIN_USER` = `admin`
+   - `ADMIN_PASS` = mật khẩu admin (local: file `.env`; production: Render Environment)
+   - `ADMIN_SESSION_SECRET` = chuỗi ngẫu nhiên dài
 2. Local: copy `.env.example` → `.env` và điền mật khẩu
-3. Render: Environment → điền `ADMIN_PASS` + `ADMIN_SESSION_SECRET`
+3. Render: Environment → điền `ADMIN_PASS` + `ADMIN_SESSION_SECRET` (blueprint đánh dấu `sync: false`)
 
 **Lưu ý Render free:** filesystem tạm — log có thể mất khi redeploy/sleep.
 
